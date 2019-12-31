@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <%- include('parts/libraries-css') %>
+  <title><%= config.site_name %> - <%= user ? user.username : 'User Not Found' %></title>
+</head>
+
+<body>
+  <%- include('parts/navbar') %>
+
+  <% if (user) { %>
+
+  <div class="container">
+    <h1><%= user.username %></h1>
+
+    <% if (user.username === currentUser.username || isAdmin) { %>
+    <a href="<%= url(path, 'edit') %>">
+      <button type="button" class="btn btn-primary">
+        Edit
+      </button>
+    </a>
+    <% } %>
+
+    <h3>Recent Submissions</h3>
+    <%- include('parts/submissions', {submissions}) %>
+  </div>
+
+  <% } %>
+
+  <% if (!user) { %>
+
+  <div class="container">
+    404 User Not Found.
+  </div>
+
+  <% } %>
+
+  <%- include('parts/libraries-js') %>
+</body>
+
+</html>

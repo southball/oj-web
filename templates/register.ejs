@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <%- include('parts/libraries-css') %>
+  <title><%= config.site_name %> - Register</title>
+</head>
+
+<body>
+  <%- include('parts/navbar') %>
+
+  <div class="container">
+    <h1>Register</h1>
+
+    <% if (errors.length) { %>
+    <div class="alert alert-danger">
+      Errors:
+      <ul style="margin-bottom: 0;">
+        <% for (const error of errors) { %>
+        <li><%= error %></li>
+        <% } %>
+      </ul>
+    </div>
+    <% } %>
+
+    <form method="POST">
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input type="text" class="form-control" id="username" name="username"
+          value="<%= typeof username === 'string' ? username : '' %>" />
+      </div>
+
+      <div class="form-group">
+        <label for="display_name">Display Name</label>
+        <input type="text" class="form-control" id="display_name" name="display_name"
+          value="<%= typeof displayName === 'string' ? displayName : '' %>" />
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" class="form-control" id="password" name="password" />
+      </div>
+
+      <input type="hidden" name="redirect" value="<%= redirect || referrer || url('') %>" />
+
+      <button type="submit" class="btn btn-primary">Register</button>
+    </form>
+  </div>
+
+  <%- include('parts/libraries-js') %>
+</body>
+
+</html>

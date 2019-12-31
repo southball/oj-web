@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <%- include('parts/libraries-css') %>
+  <title><%= config.site_name %> - <%- contest ? contest.title : "Contest Not Found" %></title>
+</head>
+
+<body>
+  <%- include('parts/navbar') %>
+
+  <% if (contest) { %>
+
+  <div class="container">
+    <h1><%= contest.title %></h1>
+
+    <form method="POST">
+      <h3>Contest Name</h3>
+      <input class="form-control" type="text" name="title" value="<%= contest.title %>">
+      <br>
+
+      <div class="row">
+        <div class="col-md">
+          <h3>Start Time</h3>
+          <div class="row">
+            <div class="col-lg">
+              <input class="form-control" type="date" name="start_date"
+                value="<%= moment(contest.startTime).format('YYYY-MM-DD') %>">
+            </div>
+            <div class="col-lg">
+              <input class="form-control" type="time" name="start_time"
+                value="<%= moment(contest.startTime).format('hh:mm:ss') %>">
+            </div>
+          </div>
+          <br>
+        </div>
+
+        <div class="col-md">
+          <h3>End Time</h3>
+          <div class="row">
+            <div class="col-lg">
+              <input class="form-control" type="date" name="end_date"
+                value="<%= moment(contest.endTime).format('YYYY-MM-DD') %>">
+            </div>
+            <div class="col-lg">
+              <input class="form-control" type="time" name="end_time"
+                value="<%= moment(contest.endTime).format('hh:mm:ss') %>">
+            </div>
+          </div>
+          <br>
+        </div>
+      </div>
+
+      <div>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+      <br>
+
+      <table class="table table-hover">
+        <thead class="thead-light">
+          <tr>
+            <th>ID</th>
+            <th>Title</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          <tr>
+            <td colspan="3">
+              <label for="new_problem">Add Problem</label>
+              <div class="input-group">
+                <input name="new_problem" class="form-control" type="text">
+                <div class="input-group-append">
+                  <button type="submit" class="btn btn-primary">+</button>
+                </div>
+              </div>
+            </td>
+          </tr>
+
+          <% if (contest.problems.length === 0) { %>
+          <tr>
+            <td colspan="3">
+              There are no problems yet. Add some problems above...
+            </td>
+          </tr>
+          <% } %>
+
+          <% for (const problem of contest.problems) { %>
+          <tr>
+            <td><%= problem.id %></td>
+            <td>
+              <a href="<%= url(`contest/${contest.id}/problem/${problem.id}`) %>">
+                <%= problem.title %>
+              </a>
+            </td>
+            <td>
+              <a href="<%= url(`contest/${contest.id}/problem/${problem.id}/delete`) %>">
+                <button type="button" class="btn btn-danger">
+                  Delete
+                </button>
+              </a>
+            </td>
+          </tr>
+          <% } %>
+        </tbody>
+      </table>
+    </form>
+  </div>
+
+  <% } %>
+
+  <% if (!contest) { %>
+
+  <div class="container">
+    404 Contest Not Found
+  </div>
+
+  <% } %>
+
+  <%- include('parts/libraries-js') %>
+</body>
+
+</html>

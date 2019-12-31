@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <%- include('parts/libraries-css') %>
+  <title><%= config.site_name %> - Submissions for <%= problem.title %></title>
+</head>
+
+<body>
+  <%- include('parts/navbar') %>
+
+  <div class="container">
+    <h1>Submissions</h1>
+    <h3>
+      For
+      <a href="<%= url(path, '..') %>">
+        <%= problem.title %>
+      </a>
+      <% if (contest) { %>
+      in Contest
+      <a href="<%= url('contest', contest.id.toString()) %>">
+        <%= contest.title %>
+      </a>
+      <% } %>
+    </h3>
+    <%- include('parts/submissions', {problem}) %>
+  </div>
+
+  <%- include('parts/libraries-js') %>
+</body>
+
+</html>

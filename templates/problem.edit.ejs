@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <%- include('parts/libraries-css') %>
+  <title><%= config.site_name %> - <%- problem ? problem.title : "Problem Not Found" %></title>
+</head>
+
+<body>
+  <%- include('parts/navbar') %>
+
+  <% if (problem) { %>
+
+  <div class="container">
+    <h1>Edit Problem: <%= problem.title %></h1>
+
+    <form method="POST" enctype="multipart/form-data">
+      <h3>Title</h3>
+      <input type="text" class="form-control" name="title" value="<%= problem.title %>">
+      <br>
+
+      <div class="row">
+        <div class="col-md">
+          <h3>Time Limit (ms)</h3>
+          <input type="number" class="form-control" name="time_limit" value="<%= problem.timeLimit %>">
+          <br>
+        </div>
+
+        <div class="col-md">
+          <h3>Memory Limit (KB)</h3>
+          <input type="number" class="form-control" name="memory_limit" value="<%= problem.memoryLimit %>">
+          <br>
+        </div>
+      </div>
+
+      <h3>Description</h3>
+      <textarea class="form-control" rows="5" name="description"><%= problem.metadata.description %></textarea>
+      <br>
+
+      <h3>Input Format</h3>
+      <textarea class="form-control" rows="5" name="input_format"><%= problem.metadata.input_format %></textarea>
+      <br>
+
+      <h3>Output Format</h3>
+      <textarea class="form-control" rows="5" name="output_format"><%= problem.metadata.output_format %></textarea>
+      <br>
+
+      <h3>Test Data</h3>
+      <div class="alert alert-danger">
+        Warning: please upload a <code>.zip</code> file in the Codeforces format. The folder should contain the test
+        case
+        input and output files only, and no subfolders. You can obtain the required file by generating a full package on
+        the Codeforces polygon platform.
+      </div>
+      <input type="file" class="form-control" name="test_data">
+      <br>
+
+      <button type="submit" class="btn btn-primary">Submit</button>
+      <br>
+    </form>
+  </div>
+
+  <% } %>
+
+  <% if (!problem) { %>
+
+  <div class="container">
+    404 Problem Not Found
+  </div>
+
+  <% } %>
+
+  <%- include('parts/libraries-js') %>
+</body>
+
+</html>

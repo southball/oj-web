@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <%- include('parts/libraries-css') %>
+  <title><%= config.site_name %> - Home</title>
+</head>
+
+<body>
+  <%- include('parts/navbar') %>
+
+  <div class="container">
+    <% for (const announcement of announcements) { %>
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title"><%= announcement.title %></h5>
+        <h6 class="card-subtitle mb-2 text-muted"><%= announcement.date.toUTCString() %></h6>
+        <p class="card-text">
+          <%- announcement.content %>
+        </p>
+      </div>
+    </div>
+    <% } %>
+  </div>
+
+  <%- include('parts/libraries-js') %>
+</body>
+
+</html>

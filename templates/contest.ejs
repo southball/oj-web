@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <%- include('parts/libraries-css') %>
+  <title><%= config.site_name %> - <%- contest ? contest.title : "Contest Not Found" %></title>
+</head>
+
+<body>
+  <%- include('parts/navbar') %>
+
+  <% if (contest) { %>
+
+  <div class="container">
+    <h1><%= contest.title %></h1>
+
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item active">
+        Contest time: <%= contest.startTime.toUTCString() %> ~ <%= contest.endTime.toUTCString() %>
+      </li>
+    </ol>
+
+    <div>
+      <a href="<%= url(`contest/${contest.id}/scoreboard`) %>">
+        <button class="btn btn-success" type="button">Scoreboard</button>
+      </a>
+      <% if (isAdmin) { %>
+      <a href="<%= url(`contest/${contest.id}/edit`) %>">
+        <button class="btn btn-primary" type="button">Edit</button>
+      </a>
+      <a href="<%= url(`contest/${contest.id}/delete`) %>">
+        <button class="btn btn-danger" type="button">Delete</button>
+      </a>
+      <% } %>
+    </div>
+    <br>
+
+    <table class="table">
+      <thead class="thead-light">
+        <tr>
+          <th>ID</th>
+          <th>Title</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        <% for (const problem of contest.problems) { %>
+        <tr>
+          <td><%= problem.id %></td>
+          <td>
+            <a href="<%= url(`contest/${contest.id}/problem/${problem.id}`) %>">
+              <%= problem.title %>
+            </a>
+          </td>
+        </tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+
+  <% } %>
+
+  <% if (!contest) { %>
+
+  <div class="container">
+    404 Contest Not Found
+  </div>
+
+  <% } %>
+
+  <%- include('parts/libraries-js') %>
+</body>
+
+</html>

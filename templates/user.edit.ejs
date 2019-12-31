@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <%- include('parts/libraries-css') %>
+  <title><%= config.site_name %> - Edit <%- user.username %></title>
+</head>
+
+<body>
+  <%- include('parts/navbar') %>
+
+  <% if (user) { %>
+
+  <div class="container">
+    <h1>User Edit</h1>
+
+    <% if (messages.length) { %>
+    <div class="alert alert-success">
+      <ul style="margin-bottom: 0;">
+        <% for (const message of messages) { %>
+        <li><%= message %></li>
+        <% } %>
+      </ul>
+    </div>
+    <% } %>
+    <% if (errors.length) { %>
+    <div class="alert alert-danger">
+      <ul style="margin-bottom: 0;">
+        <% for(const error of errors) { %>
+        <li><%= error %></li>
+        <% } %>
+      </ul>
+    </div>
+    <% } %>
+
+    <form method="POST">
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input class="form-control" type="text" readonly name="username" value="<%= user.username %>">
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input class="form-control" type="password" name="password">
+      </div>
+
+      <button class="btn btn-primary" type="submit">Submit</button>
+    </form>
+  </div>
+
+  <% } %>
+
+  <% if (!user) { %>
+
+  <div class="container">
+    404 User Not Found
+  </div>
+
+  <% } %>
+
+  <%- include('parts/libraries-js') %>
+</body>
+
+</html>

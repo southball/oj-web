@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <%- include('parts/libraries-css') %>
+  <title><%= config.site_name %> - Login</title>
+</head>
+
+<body>
+  <%- include('parts/navbar') %>
+
+  <div class="container">
+    <h1>Login</h1>
+
+    <form method="POST">
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input type="text" class="form-control" id="username" name="username">
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" class="form-control" id="password" name="password">
+      </div>
+
+      <input type="hidden" name="redirect" value="<%= redirect || referrer || url('') %>">
+
+      <button type="submit" class="btn btn-primary">Login</button>
+      <a href="<%= url('auth/register') %>">
+        <button type="button" class="btn btn-secondary">Register</button>
+      </a>
+    </form>
+  </div>
+
+  <%- include('parts/libraries-js') %>
+</body>
+
+</html>

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <%- include('parts/libraries-css') %>
+  <title><%= config.site_name %> - <%= contest ? contest.title : "Contest Not Found" %></title>
+</head>
+
+<body>
+  <%- include('parts/navbar') %>
+
+  <div class="container">
+    <h1>Scoreboard</h1>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>User</th>
+          <% for (const problem of contest.problems) { %>
+          <th>
+            <a href="<%= url(`contest/${contest.id}/problem/${problem.id}`) %>">
+              <%= problem.id %>. <%= problem.title %>
+            </a>
+          </th>
+          <% } %>
+        </tr>
+      </thead>
+      <% for (const user of users) { %>
+      <tr>
+        <td>
+          <a href="<%= url('user', user.username) %>">
+            <%= user.username %>
+          </a>
+        </td>
+        <% for (const problem of contest.problems) { %>
+        <td>
+          <% if (submissions[user.username][problem.id]) { %>
+          <span class="badge badge-<%= verdictBadgeType(submissions[user.username][problem.id].verdict) %>">
+            <%= submissions[user.username][problem.id].verdict %>
+          </span>
+          <%= moment.duration(moment().diff(contest.startTime)).locale("en").humanize() %>
+          <% } else { %>
+          -
+          <% } %>
+        </td>
+        <% } %>
+      </tr>
+      <% } %>
+    </table c>
+  </div>
+
+  <%- include('parts/libraries-js') %>
+</body>
+
+</html>

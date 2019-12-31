@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <%- include('parts/libraries-css') %>
+  <title><%= config.site_name %> - <%- problem ? problem.title : "Problem Not Found" %></title>
+</head>
+
+<body>
+  <%- include('parts/navbar') %>
+
+  <% if (problem) { %>
+
+  <div class="container">
+    <% if (contest) { %>
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item active">
+        Back to
+        <a href="<%= url(`contest/${contest.id}`) %>">
+          Contest: <%= contest.title %>
+        </a>
+      </li>
+    </ol>
+    <% } %>
+
+    <h1><%= problem.title %></h1>
+
+    <div>
+      <a href="<%= url(path, 'submissions') %>">
+        <button type="button" class="btn btn-primary">Submissions</button>
+      </a>
+
+      <% if (isAdmin) { %>
+      <a href="<%= url(`problem/${problem.id}/edit`) %>">
+        <button type="button" class="btn btn-primary">Edit</button>
+      </a>
+      <% } %>
+    </div>
+
+    <% if (problem.author) { %>
+    <h3>Author</h3>
+    <div><%= problem.author.username %></div>
+    <br>
+    <% } %>
+
+    <% if (problem.metadata.description) { %>
+    <h3>Description</h3>
+    <div><%- problem.metadata.description %></div>
+    <br>
+    <% } %>
+
+    <% if (problem.metadata.input_format) { %>
+    <h3>Input Format</h3>
+    <div><%- problem.metadata.input_format %></div>
+    <br>
+    <% } %>
+
+    <% if (problem.metadata.output_format) { %>
+    <h3>Output Format</h3>
+    <div><%- problem.metadata.output_format %></div>
+    <br>
+    <% } %>
+
+    <% if (currentUser && (!contest || contest.startTime < new Date() && new Date() < contest.endTime)) { %>
+    <h3>Submit</h3>
+    <form action="<%= url(path, 'submit') %>" method="POST">
+      <div class="form-group">
+        <label for="language">Language</label>
+        <select class="form-control" id="language" name="language">
+          <option value="cpp">C++</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="code">Source Code</label>
+        <textarea name="code" rows="8" class="form-control"
+          style="font-family: 'Courier New', Courier, monospace"></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary">
+        Submit
+      </button>
+    </form>
+    <% } %>
+  </div>
+  <br>
+
+  <% } %>
+
+  <% if (!problem) { %>
+
+  <div class="container">
+    404 Problem Not Found
+  </div>
+
+  <% } %>
+
+  <%- include('parts/libraries-js') %>
+</body>
+
+</html>

@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <%- include('parts/libraries-css') %>
+  <title><%= config.site_name %> - Submission <%= submission.id %></title>
+</head>
+
+<body>
+  <%- include('parts/navbar') %>
+
+  <div class="container">
+    <h3>
+      Submission <%= submission.id %> for
+      <a href="<%= url(`problem/${problem.id}`) %>">
+        <%= problem.title %>
+      </a>
+    </h3>
+
+    <div class="accordion">
+      <% if (isAdmin) { %>
+      <div class="card">
+        <div class="card-header">
+          <span data-toggle="collapse" data-target="#admin-collapse" style="cursor: pointer;">▼ Admin</span>
+        </div>
+        <div id="admin-collapse" class="collapse">
+          <div class="card">
+            <div class="card-body">
+              <a href="<%= url(path, 'rejudge') %>">
+                <button type="button" class="btn btn-primary">Rejudge</button>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+      <% } %>
+
+      <% if (submission.judgerOutput && submission.judgerOutput.message) { %>
+      <div class="card">
+        <div class="card-header">
+          <span data-toggle="collapse" data-target="#message-collapse" style="cursor: pointer;">▼ Message</span>
+        </div>
+        <div id="message-collapse" class="collapse show">
+          <pre style="margin-bottom: 0;"><code class="cpp"><%= submission.judgerOutput.message %></code></pre>
+        </div>
+      </div>
+      <% } %>
+
+      <div class="card">
+        <div class="card-header">
+          <span data-toggle="collapse" data-target="#source-code-collapse" style="cursor: pointer;">▼ Source Code</span>
+        </div>
+        <div id="source-code-collapse" class="collapse show">
+          <pre style="margin-bottom: 0;"><code class="cpp"><%= submission.body %></code></pre>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span data-toggle="collapse" data-target="#data-collapse" style="cursor: pointer;">▼ Data</span>
+        </div>
+        <div id="data-collapse" class="collapse show">
+          <table class="table" style="margin-bottom: 0;">
+            <tbody>
+              <tr>
+                <th>User</th>
+                <td>
+                  <a href="<%= url('user', submission.user.username) %>">
+                    <%= submission.user.username %>
+                  </a>
+                </td>
+              </tr>
+              <tr>
+                <th>Submission Time</th>
+                <td><%= moment(submission.time).format('YYYY-MM-DD hh:mm:ss') %></td>
+              </tr>
+              <tr>
+                <th>Verdict</th>
+                <td>
+                  <span class="badge badge-<%= verdictBadgeType(submission.verdict) %>">
+                    <%= submission.verdict %>
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <th>Time</th>
+                <td><%= 
+                  submission.judgerOutput && submission.judgerOutput.tests && 
+                  Math.max(...Object.entries(submission.judgerOutput.tests).map(([, test]) => +test.time)).toFixed(3) + ' s' || '-'
+                  %></td>
+              </tr>
+              <tr>
+                <th>Memory</th>
+                <td><%= 
+                  submission.judgerOutput && submission.judgerOutput.tests && 
+                  (Math.max(...Object.entries(submission.judgerOutput.tests).map(([, test]) => +test.memory)) / 1024).toFixed(2) + ' MB' || '-'
+                  %></td>
+              </tr>
+              <% if (isAdmin) { %>
+              <tr>
+                <th>Judger</th>
+                <td><%= submission.judger %></td>
+              </tr>
+              <% } %>
+            </tbody>
+
+          </table>
+        </div>
+      </div>
+
+      <% if (submission.judgerOutput && submission.judgerOutput.tests) { %>
+      <div class="card">
+        <div class="card-header">
+          <span data-toggle="collapse" data-target="#tests-collapse" style="cursor: pointer;">▼ Test Cases</span>
+        </div>
+        <div id="tests-collapse" class="collapse show">
+          <table class="table table-hover" style="margin-bottom: 0;">
+            <thead>
+              <tr>
+                <th>Case</th>
+                <th>Verdict</th>
+                <th>Time</th>
+                <th>Memory</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              <% for (const [infile, data] of Object.entries(submission.judgerOutput.tests)) { %>
+              <tr>
+                <th><%= infile %></th>
+                <td>
+                  <span class="badge badge-<%= verdictBadgeType(data.verdict) %>"><%= data.verdict %></span>
+                </td>
+                <td>
+                  <%= data.time %> s
+                </td>
+                <td>
+                  <%= (data.memory/1024).toFixed(2) %> MB
+                </td>
+                <% if (isAdmin) { %>
+              <tr>
+                <td colspan="4" style="padding: 0;">
+                  <div class="card">
+                    <div class="card-header" style="padding-top: 4px; padding-bottom: 4px;">
+                      <span data-toggle="collapse" data-target="#detail-<%= infile %>-collapse"
+                        style="cursor: pointer;">▼ Detail</span>
+                    </div>
+                    <div id="detail-<%= infile %>-collapse" class="collapse" style="padding: 12px;">
+                      <div class="row">
+                        <div class="col-lg">
+                          Meta:<br>
+                          <pre><code><%= data.meta %></code></pre>
+                        </div>
+                        <div class="col-lg">
+                          Message:
+                          <pre><code><%= data.message %></code></pre>
+                        </div>
+                        <div class="col-lg">
+                          Output:
+                          <pre><code><%= data.output %></code></pre>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+              <% } %>
+              </tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <% } %>
+    </div>
+  </div>
+
+  <%- include('parts/libraries-js') %>
+</body>
+
+</html>

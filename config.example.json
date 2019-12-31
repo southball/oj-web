@@ -1,0 +1,16 @@
+{
+  "database": {
+    "dialect": "sqlite",
+    "storage": "database.sqlite",
+    "logging": false,
+    "define": {
+      "timestamps": false
+    }
+  },
+  "site_name": "Online Judge",
+  "session_secret": "cb73f2a1-3ef1-494e-9f3c-77f8bb6c7889",
+  "server_root": "http://example.com/",
+  "port": 80,
+  "data_folder": "/home/user/judge/web/data",
+  "upload_folder": "/home/user/judge/web/uploads"
+}
