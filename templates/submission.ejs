@@ -12,8 +12,8 @@
   <div class="container">
     <h3>
       Submission <%= submission.id %> for
-      <a href="<%= url(`problem/${problem.id}`) %>">
-        <%= problem.title %>
+      <a href="<%= url(`problem/${submission.problem.id}`) %>">
+        <%= submission.problem.title %>
       </a>
     </h3>
 
@@ -60,7 +60,7 @@
           <span data-toggle="collapse" data-target="#data-collapse" style="cursor: pointer;">▼ Data</span>
         </div>
         <div id="data-collapse" class="collapse show">
-          <table class="table" style="margin-bottom: 0;">
+          <table class="table table-bordered table-oj table-hover" style="margin-bottom: 0;">
             <tbody>
               <tr>
                 <th>User</th>
@@ -75,6 +75,12 @@
                 <td><%= moment(submission.time).format('YYYY-MM-DD hh:mm:ss') %></td>
               </tr>
               <tr>
+                <th>Language</th>
+                <td>
+                  <%= submission.language %>
+                </td>
+              </tr>
+              <tr>
                 <th>Verdict</th>
                 <td>
                   <span class="badge badge-<%= verdictBadgeType(submission.verdict) %>">
@@ -82,20 +88,22 @@
                   </span>
                 </td>
               </tr>
+              <% if (submission.verdict !== "WJ") { %>
               <tr>
                 <th>Time</th>
                 <td><%= 
                   submission.judgerOutput && submission.judgerOutput.tests && 
-                  Math.max(...Object.entries(submission.judgerOutput.tests).map(([, test]) => +test.time)).toFixed(3) + ' s' || '-'
+                  Math.max(...Object.entries(submission.judgerOutput.tests).filter(([, test]) => test.verdict !== "WJ").map(([, test]) => +test.time)).toFixed(3) + ' s' || '-'
                   %></td>
               </tr>
               <tr>
                 <th>Memory</th>
                 <td><%= 
                   submission.judgerOutput && submission.judgerOutput.tests && 
-                  (Math.max(...Object.entries(submission.judgerOutput.tests).map(([, test]) => +test.memory)) / 1024).toFixed(2) + ' MB' || '-'
+                  (Math.max(...Object.entries(submission.judgerOutput.tests).filter(([, test]) => test.verdict !== "WJ").map(([, test]) => +test.memory)) / 1000).toFixed(3) + ' MB' || '-'
                   %></td>
               </tr>
+              <% } %>
               <% if (isAdmin) { %>
               <tr>
                 <th>Judger</th>
@@ -108,13 +116,12 @@
         </div>
       </div>
 
-      <% if (submission.judgerOutput && submission.judgerOutput.tests) { %>
       <div class="card">
         <div class="card-header">
           <span data-toggle="collapse" data-target="#tests-collapse" style="cursor: pointer;">▼ Test Cases</span>
         </div>
         <div id="tests-collapse" class="collapse show">
-          <table class="table table-hover" style="margin-bottom: 0;">
+          <table class="table table-bordered table-oj table-hover" style="margin-bottom: 0;">
             <thead>
               <tr>
                 <th>Case</th>
@@ -125,6 +132,9 @@
             </thead>
 
             <tbody>
+              <% if (submission.verdict !== "WJ" || isAdmin) { %>
+
+              <% if (submission.judgerOutput && submission.judgerOutput.tests) { %>
               <% for (const [infile, data] of Object.entries(submission.judgerOutput.tests)) { %>
               <tr>
                 <th><%= infile %></th>
@@ -132,12 +142,18 @@
                   <span class="badge badge-<%= verdictBadgeType(data.verdict) %>"><%= data.verdict %></span>
                 </td>
                 <td>
+                  <% if (data.verdict !== "WJ") { %>
                   <%= data.time %> s
+                  <% } %>
                 </td>
                 <td>
-                  <%= (data.memory/1024).toFixed(2) %> MB
+                  <% if (data.verdict !== "WJ") { %>
+                  <%= (data.memory / 1000).toFixed(3) %> MB
+                  <% } %>
                 </td>
-                <% if (isAdmin) { %>
+              </tr>
+
+              <% if (isAdmin) { %>
               <tr>
                 <td colspan="4" style="padding: 0;">
                   <div class="card">
@@ -165,15 +181,26 @@
                 </td>
               </tr>
               <% } %>
+
+              <% } %>
+              <% } %>
+
+              <% } else { %>
+
+              <tr>
+                <td>The solution is being judged. The status for each test case will be displayed after all test cases
+                  are judged.</td>
               </tr>
+
               <% } %>
             </tbody>
           </table>
         </div>
       </div>
-      <% } %>
     </div>
   </div>
+
+  <br>
 
   <%- include('parts/libraries-js') %>
 </body>

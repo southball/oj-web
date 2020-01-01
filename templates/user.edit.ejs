@@ -14,24 +14,7 @@
   <div class="container">
     <h1>User Edit</h1>
 
-    <% if (messages.length) { %>
-    <div class="alert alert-success">
-      <ul style="margin-bottom: 0;">
-        <% for (const message of messages) { %>
-        <li><%= message %></li>
-        <% } %>
-      </ul>
-    </div>
-    <% } %>
-    <% if (errors.length) { %>
-    <div class="alert alert-danger">
-      <ul style="margin-bottom: 0;">
-        <% for(const error of errors) { %>
-        <li><%= error %></li>
-        <% } %>
-      </ul>
-    </div>
-    <% } %>
+    <%- include('parts/messages') %>
 
     <form method="POST">
       <div class="form-group">

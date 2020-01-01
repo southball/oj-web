@@ -12,6 +12,9 @@ const util = require("util");
 const path = require("path");
 const fs = require("fs");
 const fse = require("fs-extra");
+const Sequelize = require("sequelize");
+
+const Op = Sequelize.Op;
 
 const SequelizeStore = require("connect-session-sequelize")(session.Store);
 
@@ -23,7 +26,8 @@ const {
   Problem,
   Contest,
   Submission,
-  Judge
+  Judge,
+  ContestProblem
 } = require("./database");
 
 async function createServer(sequelize, config) {
@@ -33,18 +37,13 @@ async function createServer(sequelize, config) {
   app.set("views", "templates");
 
   console.log("Copying files from resource folder to data folder...");
-  await util.promisify(fse.remove)(
-    path.resolve(config.data_folder, "resource")
-  );
-  await util.promisify(fse.copy)(
-    path.resolve(__dirname, "../resource"),
-    path.resolve(config.data_folder, "resource")
-  );
+  await util.promisify(fse.remove)(path.resolve(config.data_folder, "resource"));
+  await util.promisify(fse.copy)(path.resolve(__dirname, "../resource"), path.resolve(config.data_folder, "resource"));
 
   async function urlMiddleware(req, res, next) {
     res.locals.url = (...parts) =>
       parts.reduce((cur, part) => {
-        return url.resolve(cur.endsWith("/") ? cur : cur + "/", part);
+        return url.resolve(cur.endsWith("/") ? cur : cur + "/", part.toString());
       }, config.server_root);
 
     res.locals.verdictBadgeType = verdict => {
@@ -61,8 +60,7 @@ async function createServer(sequelize, config) {
       res.locals.currentUser = await User.findByPk(req.session.userId);
     }
 
-    res.locals.isAdmin =
-      res.locals.currentUser && res.locals.currentUser.role === "admin";
+    res.locals.isAdmin = res.locals.currentUser && res.locals.currentUser.role === "admin";
     res.locals.path = req.path;
     res.locals.moment = moment;
     res.locals.config = config;
@@ -147,10 +145,7 @@ async function createServer(sequelize, config) {
       where: { username: req.params.username }
     });
 
-    if (
-      user.username === res.locals.currentUser.username ||
-      res.locals.isAdmin
-    ) {
+    if (user.username === res.locals.currentUser.username || res.locals.isAdmin) {
       res.render("user.edit.ejs", { user, errors: [], messages: [] });
     } else {
       res.render("403");
@@ -162,10 +157,7 @@ async function createServer(sequelize, config) {
       where: { username: req.params.username }
     });
 
-    if (
-      user.username !== res.locals.currentUser.username &&
-      !res.locals.isAdmin
-    ) {
+    if (user.username !== res.locals.currentUser.username && !res.locals.isAdmin) {
       res.render("403");
       return;
     }
@@ -189,7 +181,14 @@ async function createServer(sequelize, config) {
   });
 
   app.get("/contests", async (req, res) => {
-    const contests = await Contest.findAll();
+    const showPublicOnly = !res.locals.isAdmin;
+    const contests = await Contest.findAll({
+      where: {
+        isPublic: {
+          [Op.or]: showPublicOnly ? [true] : [true, false]
+        }
+      }
+    });
     res.render("contests", { contests });
   });
 
@@ -202,11 +201,10 @@ async function createServer(sequelize, config) {
 
   app.get("/contest/:contest", async (req, res) => {
     const id = isFinite(+req.params.contest) ? +req.params.contest : -1;
-    const contest = await Contest.findByPk(id);
-
-    if (contest) {
-      contest.problems = await contest.getProblems();
-    }
+    const contest = await Contest.findByPk(id, {
+      include: [{ model: ContestProblem, as: "contestProblems", include: [{ model: Problem, as: "problem" }] }],
+      order: [[{ model: ContestProblem, as: "contestProblems" }, "name", "ASC"]]
+    });
 
     res.render("contest", { contest });
   });
@@ -214,7 +212,13 @@ async function createServer(sequelize, config) {
   app.get("/contest/:contest/scoreboard", async (req, res) => {
     const contestId = isFinite(+req.params.contest) ? +req.params.contest : -1;
     const contest = await Contest.findByPk(contestId, {
-      include: [{ model: Problem, as: "problems" }]
+      include: [
+        {
+          model: ContestProblem,
+          as: "contestProblems",
+          include: [{ model: Problem, as: "problem" }]
+        }
+      ]
     });
 
     if (!contest) {
@@ -226,78 +230,162 @@ async function createServer(sequelize, config) {
       order: [["time", "ASC"]],
       include: [
         { model: User, as: "user" },
-        { model: Problem, as: "problem" }
+        { model: Problem, as: "problem" },
+        { model: Contest, as: "contest" },
+        { model: ContestProblem, as: "contestProblem" }
       ]
     });
 
-    const submissionGrid = {};
     const users = new Map();
+    // username -> {user, score, penalty, { id -> submission }}
 
     for (const submission of submissions) {
       if (!users.get(submission.user.username))
-        users.set(submission.user.username, submission.user);
-      if (!submissionGrid[submission.user.username])
-        submissionGrid[submission.user.username] = {};
-      if (
-        !submissionGrid[submission.user.username][submission.problem.id] ||
-        (submissionGrid[submission.user.username][submission.problem.id]
-          .verdict !== "AC" &&
-          submission.verdict === "AC")
-      ) {
-        submissionGrid[submission.user.username][
-          submission.problem.id
-        ] = submission;
+        users.set(submission.user.username, {
+          user: submission.user,
+          score: 0,
+          penalty: 0,
+          submissions: new Map()
+        });
+
+      const userEntry = users.get(submission.user.username);
+      const lastSubmission = userEntry.submissions.get(submission.contestProblem.name);
+
+      if (!lastSubmission || lastSubmission.verdict !== "AC") {
+        userEntry.submissions.set(submission.contestProblem.name, submission);
+
+        if (submission.verdict === "AC") {
+          userEntry.penalty += moment.duration(moment(submission.time).diff(moment(contest.startTime))).asMinutes();
+          userEntry.score += submission.contestProblem.score;
+        }
       }
     }
 
+    const userList = [...users.entries()].map(([_, user]) => user);
+
+    userList.sort((user1, user2) => {
+      if (user1.score != user2.score) return user1.score < user2.score;
+      if (user1.penalty != user2.penalty) return user1.penalty > user2.penalty;
+      return user1.user.username > user2.user.username;
+    });
+
     res.render("scoreboard", {
       contest,
-      submissions: submissionGrid,
-      users: [...users.entries()].map(([, user]) => user)
+      users: userList
     });
   });
 
   app.get("/contest/:contest/edit", adminMiddleware, async (req, res) => {
     const id = isFinite(+req.params.contest) ? +req.params.contest : -1;
-    const contest = await Contest.findByPk(id);
-
-    if (contest) {
-      contest.problems = await contest.getProblems();
-    }
+    const contest = await Contest.findByPk(id, {
+      include: [
+        {
+          model: ContestProblem,
+          as: "contestProblems",
+          include: [{ model: Problem, as: "problem" }]
+        }
+      ],
+      order: [[{ model: ContestProblem, as: "contestProblems" }, "name", "ASC"]]
+    });
 
     res.render("contest.edit.ejs", { contest });
   });
 
   app.post("/contest/:contest/edit", adminMiddleware, async (req, res) => {
-    const id = isFinite(+req.params.contest) ? +req.params.contest : -1;
-    const contest = await Contest.findByPk(id);
+    const contestId = isFinite(+req.params.contest) ? +req.params.contest : -1;
+    const contest = await Contest.findByPk(contestId, {
+      include: [
+        {
+          model: ContestProblem,
+          as: "contestProblems",
+          include: [{ model: Problem, as: "problem" }]
+        }
+      ],
+      order: [[{ model: ContestProblem, as: "contestProblems" }, "name", "ASC"]]
+    });
+
+    const errors = [];
+    const messages = [];
 
     if (contest) {
-      const startTime = new Date(
-        req.body.start_date + " " + req.body.start_time
-      );
+      const startTime = new Date(req.body.start_date + " " + req.body.start_time);
       const endTime = new Date(req.body.end_date + " " + req.body.end_time);
 
       contest.title = req.body.title;
       contest.startTime = startTime;
       contest.endTime = endTime;
+      contest.isPublic = req.body.is_public === "true";
 
       if (req.body.new_problem) {
-        const problemId = isFinite(+req.body.new_problem)
-          ? +req.body.new_problem
-          : -1;
+        const problemId = isFinite(+req.body.new_problem) ? +req.body.new_problem : -1;
+        const name = req.body.new_problem_name;
         const problem = await Problem.findByPk(problemId);
 
-        if (!(await contest.hasProblem(problem)))
-          await contest.addProblem(problem);
+        let canAdd = true;
+
+        // Check problem exists
+        {
+          if (!problem) {
+            canAdd = false;
+            errors.push("The problem does not exist.");
+          }
+        }
+
+        // Check name collision
+        {
+          let contestProblem = await ContestProblem.findOne({
+            where: { contestId, name }
+          });
+
+          if (contestProblem) {
+            canAdd = false;
+            errors.push("The problem name is already occupied");
+          }
+        }
+
+        // Check problem collision
+        {
+          let contestProblem = await ContestProblem.findOne({
+            where: { contestId, problemId }
+          });
+
+          if (contestProblem) {
+            canAdd = false;
+            errors.push("The problem is already in the contest.");
+          }
+        }
+
+        if (canAdd) {
+          const contestProblem = new ContestProblem();
+          contestProblem.name = name;
+          await contestProblem.save();
+
+          await contestProblem.setContest(contest);
+          await contestProblem.setProblem(problem);
+        }
       }
 
-      await contest.save();
+      for (let i in req.body.name) {
+        contest.contestProblems[i].name = req.body.name[i];
+        contest.contestProblems[i].score = isFinite(+req.body.score[i]) ? +req.body.score[i] : 0;
+      }
 
-      contest.problems = await contest.getProblems();
+      await Promise.all(contest.contestProblems.map(problem => problem.save()));
+      await contest.save();
     }
 
-    res.render("contest.edit.ejs", { contest });
+    const newContest = await Contest.findByPk(contestId, {
+      include: [
+        {
+          model: ContestProblem,
+          as: "contestProblems",
+          include: [{ model: Problem, as: "problem" }]
+        }
+      ],
+      order: [[{ model: ContestProblem, as: "contestProblems" }, "name", "ASC"]]
+    });
+
+    res.render("contest.edit.ejs", { contest: newContest, errors, messages });
   });
 
   app.get("/contest/:contest/delete", adminMiddleware, async (req, res) => {
@@ -311,67 +399,172 @@ async function createServer(sequelize, config) {
     res.redirect(res.locals.url("contests"));
   });
 
-  app.get("/contest/:contest/problem/:problem", async (req, res) => {
+  app.get("/contest/:contest/problem/:contestProblem", async (req, res) => {
     const contestId = req.params.contest;
-    const problemId = req.params.problem;
-    const contest = await Contest.findByPk(contestId);
-    let problem = await Problem.findByPk(problemId);
+    const contestProblemName = req.params.contestProblem;
 
-    if (!(await contest.hasProblem(problem))) {
-      problem = null;
+    const contestProblem = await ContestProblem.findOne({
+      where: { contestId, name: contestProblemName },
+      include: [
+        { model: Contest, as: "contest" },
+        {
+          model: Problem,
+          as: "problem",
+          include: [{ model: User, as: "author" }]
+        }
+      ]
+    });
+
+    if (!contestProblem) {
+      res.render("404");
+      return;
     }
 
-    if (problem) {
-      problem.author = await problem.getUser();
-      problem.metadata = JSON.parse(problem.metadata);
-    }
+    contestProblem.problem.metadata = JSON.parse(contestProblem.problem.metadata);
 
-    res.render("problem", { contest, problem });
+    res.render("problem", {
+      contest: contestProblem.contest || null,
+      problem: contestProblem.problem || null,
+      contestProblem
+    });
   });
 
-  app.get(
-    "/contest/:contest/problem/:problem/submissions",
-    async (req, res) => {
-      const contestId = isFinite(+req.params.contest)
-        ? +req.params.contest
-        : -1;
-      const contest = await Contest.findByPk(contestId);
-      const problemId = isFinite(+req.params.problem)
-        ? +req.params.problem
-        : -1;
-      const problem = await Problem.findByPk(problemId);
+  app.get("/contest/:contest/problem/:contestProblem/submissions", async (req, res) => {
+    const contestId = isFinite(+req.params.contest) ? +req.params.contest : -1;
+    const contestProblemName = req.params.contestProblem;
 
-      if (!(await contest.hasProblem(problem))) {
-        res.render("403");
-        return;
-      }
+    const contestProblem = await ContestProblem.findOne({
+      where: { contestId, name: contestProblemName },
+      include: [
+        { model: Contest, as: "contest" },
+        {
+          model: Problem,
+          as: "problem",
+          include: [{ model: User, as: "author" }]
+        }
+      ]
+    });
 
-      const submissions = await problem.getSubmissions({
-        where: { contestId: contest.id },
-        include: [
-          { model: User, as: "user" },
-          { model: Problem, as: "problem" }
-        ],
-        order: [["time", "DESC"]]
-      });
-
-      res.render("submissions", { problem, submissions, contest });
+    if (!contestProblem) {
+      res.render("404");
+      res.end("");
     }
-  );
 
-  app.post("/contest/:contest/problem/:problem/submit", async (req, res) => {
+    const submissions = await contestProblem.getSubmissions({
+      include: [
+        { model: User, as: "user" },
+        { model: Problem, as: "problem" },
+        { model: ContestProblem, as: "contestProblem" }
+      ],
+      order: [["time", "DESC"]]
+    });
+
+    res.render("submissions", {
+      submissions,
+      problem: contestProblem.problem,
+      contest: contestProblem.contest
+    });
+  });
+
+  app.get("/contest/:contest/problem/:contestProblem/submission/:submission", async (req, res) => {
+    const contestId = isFinite(+req.params.contest) ? +req.params.contest : -1;
+    const contestProblemName = req.params.contestProblem;
+
+    const contestProblem = await ContestProblem.findOne({
+      where: { contestId, name: contestProblemName },
+      include: [
+        { model: Contest, as: "contest" },
+        { model: Problem, as: "problem" }
+      ]
+    });
+
+    if (!contestProblem) {
+      res.render("404");
+      return;
+    }
+
+    const submissionId = isFinite(+req.params.submission) ? +req.params.submission : -1;
+    const submission = await Submission.findByPk(submissionId, {
+      include: [
+        { model: Contest, as: "contest" },
+        { model: Problem, as: "problem" },
+        { model: ContestProblem, as: "contestProblem" },
+        { model: User, as: "user" }
+      ]
+    });
+
+    if (!(await contestProblem.hasSubmission(submission))) {
+      res.render("404");
+      return;
+    }
+
+    if (submission && submission.judgerOutput) {
+      submission.judgerOutput = JSON.parse(submission.judgerOutput);
+    }
+
+    res.render("submission", { submission });
+  });
+
+  app.get("/contest/:contest/problem/:contestProblem/submission/:submission/rejudge", async (req, res) => {
+    const contestId = isFinite(+req.params.contest) ? +req.params.contest : -1;
+    const contestProblemName = req.params.contestProblem;
+
+    const contestProblem = await ContestProblem.findOne({
+      where: { contestId, name: contestProblemName },
+      include: [
+        { model: Contest, as: "contest" },
+        { model: Problem, as: "problem" }
+      ]
+    });
+
+    if (!contestProblem) {
+      res.render("404");
+      return;
+    }
+
+    const submissionId = isFinite(+req.params.submission) ? +req.params.submission : -1;
+    const submission = await Submission.findByPk(submissionId, {
+      include: [
+        { model: Contest, as: "contest" },
+        { model: Problem, as: "problem" },
+        { model: ContestProblem, as: "contestProblem" },
+        { model: User, as: "user" }
+      ]
+    });
+
+    if (!(await contestProblem.hasSubmission(submission))) {
+      res.render("404");
+      return;
+    }
+
+    submission.judger = "";
+    submission.verdict = "WJ";
+    submission.judgerOutput = "";
+
+    await submission.save();
+
+    res.redirect(res.locals.url(res.locals.path, ".."));
+  });
+
+  app.post("/contest/:contest/problem/:contestProblem/submit", async (req, res) => {
     if (!res.locals.currentUser) {
       res.render("403");
       return;
     }
 
     const contestId = isFinite(+req.params.contest) ? +req.params.contest : -1;
-    const contest = await Contest.findByPk(contestId);
-    const problemId = isFinite(+req.params.problem) ? +req.params.problem : -1;
-    const problem = await Problem.findByPk(problemId);
+    const contestProblemName = req.params.contestProblem;
 
-    if (!contest || !problem || !(await contest.hasProblem(problem))) {
-      res.render("403");
+    const contestProblem = await ContestProblem.findOne({
+      where: { contestId, name: contestProblemName },
+      include: [
+        { model: Contest, as: "contest" },
+        { model: Problem, as: "problem" }
+      ]
+    });
+
+    if (!contestProblem) {
+      res.render("404");
       return;
     }
 
@@ -382,42 +575,54 @@ async function createServer(sequelize, config) {
     submission.body = code;
 
     await submission.save();
+
     await submission.setUser(res.locals.currentUser);
-    await submission.setProblem(problem);
-    await submission.setContest(contest);
+    await submission.setProblem(contestProblem.problem);
+    await submission.setContest(contestProblem.contest);
+    await submission.setContestProblem(contestProblem);
 
-    await submission.save();
-
-    res.redirect(
-      res.locals.url(`problem/${problemId}/submission/${submission.id}`)
-    );
+    res.redirect(res.locals.url(`contest/${contestId}/problem/${contestProblemName}/submission/${submission.id}`));
   });
 
-  app.get(
-    "/contest/:contest/problem/:problem/delete",
-    adminMiddleware,
-    async (req, res) => {
-      const redirect =
-        req.get("Referrer") || res.local.url(`contest/${contest.id}/edit`);
-      const contestId = isFinite(+req.params.contest)
-        ? +req.params.contest
-        : -1;
-      const problemId = isFinite(+req.params.problem)
-        ? +req.params.problem
-        : -1;
-      const contest = await Contest.findByPk(contestId);
-      const problem = await Problem.findByPk(problemId);
+  app.get("/contest/:contest/problem/:contestProblem/delete", adminMiddleware, async (req, res) => {
+    const redirect = req.get("Referrer") || res.local.url(`contest/${contest.id}/edit`);
 
-      if (await contest.hasProblem(problem)) {
-        await contest.removeProblem(problem);
-      }
+    const contestId = req.params.contest;
+    const contestProblemName = req.params.contestProblem;
 
-      res.redirect(redirect);
+    const contestProblem = await ContestProblem.findOne({
+      where: { contestId, name: contestProblemName },
+      include: [
+        { model: Contest, as: "contest" },
+        {
+          model: Problem,
+          as: "problem",
+          include: [{ model: User, as: "author" }]
+        }
+      ]
+    });
+
+    if (!contestProblem) {
+      res.render("404");
+      return;
     }
-  );
+
+    await contestProblem.destroy();
+
+    res.redirect(redirect);
+  });
 
   app.get("/problems", async (req, res) => {
-    const problems = await Problem.findAll();
+    const showPublicOnly = !res.locals.isAdmin;
+    const problems = await Problem.findAll({
+      where: {
+        isPublic: {
+          [Op.or]: showPublicOnly ? [true] : [true, false]
+        }
+      },
+      include: [{ model: User, as: "author" }]
+    });
+
     res.render("problems", { problems });
   });
 
@@ -430,10 +635,11 @@ async function createServer(sequelize, config) {
 
   app.get("/problem/:problem", async (req, res) => {
     const id = isFinite(+req.params.problem) ? +req.params.problem : -1;
-    const problem = await Problem.findByPk(id);
+    const problem = await Problem.findByPk(id, {
+      include: [{ model: User, as: "author" }]
+    });
 
     if (problem) {
-      problem.author = await problem.getUser();
       problem.metadata = JSON.parse(problem.metadata);
     }
 
@@ -470,9 +676,7 @@ async function createServer(sequelize, config) {
 
     await submission.save();
 
-    res.redirect(
-      res.locals.url(`problem/${problemId}/submission/${submission.id}`)
-    );
+    res.redirect(res.locals.url(`problem/${problemId}/submission/${submission.id}`));
   });
 
   app.get("/problem/:problem/submissions", async (req, res) => {
@@ -491,9 +695,7 @@ async function createServer(sequelize, config) {
 
   app.get("/problem/:problem/submission/:submission", async (req, res) => {
     const problemId = isFinite(+req.params.problem) ? +req.params.problem : -1;
-    const submissionId = isFinite(+req.params.submission)
-      ? +req.params.submission
-      : -1;
+    const submissionId = isFinite(+req.params.submission) ? +req.params.submission : -1;
     const problem = await Problem.findByPk(problemId);
     let submission = await Submission.findByPk(submissionId, {
       include: [
@@ -513,43 +715,36 @@ async function createServer(sequelize, config) {
     res.render("submission", { problem, submission });
   });
 
-  app.get(
-    "/problem/:problem/submission/:submission/rejudge",
-    adminMiddleware,
-    async (req, res) => {
-      const problemId = isFinite(+req.params.problem)
-        ? +req.params.problem
-        : -1;
-      const submissionId = isFinite(+req.params.submission)
-        ? +req.params.submission
-        : -1;
-      const problem = await Problem.findByPk(problemId);
-      let submission = await Submission.findByPk(submissionId, {
-        include: [
-          { model: Problem, as: "problem" },
-          { model: User, as: "user" }
-        ]
-      });
+  app.get("/problem/:problem/submission/:submission/rejudge", adminMiddleware, async (req, res) => {
+    const problemId = isFinite(+req.params.problem) ? +req.params.problem : -1;
+    const submissionId = isFinite(+req.params.submission) ? +req.params.submission : -1;
+    const problem = await Problem.findByPk(problemId);
+    let submission = await Submission.findByPk(submissionId, {
+      include: [
+        { model: Problem, as: "problem" },
+        { model: User, as: "user" }
+      ]
+    });
 
-      submission.verdict = "WJ";
-      submission.judger = "";
-      submission.judgerOutput = "{}";
-
-      await submission.save();
-
-      if (!(await problem.hasSubmission(submission))) {
-        submission = null;
-      }
-
-      res.redirect(
-        res.locals.url(`problem/${problemId}/submission/${submissionId}`)
-      );
+    if (!(await problem.hasSubmission(submission))) {
+      res.render("404");
+      return;
     }
-  );
+
+    submission.verdict = "WJ";
+    submission.judger = "";
+    submission.judgerOutput = "{}";
+
+    await submission.save();
+
+    res.redirect(res.locals.url(`problem/${problemId}/submission/${submissionId}`));
+  });
 
   app.get("/problem/:problem/edit", adminMiddleware, async (req, res) => {
     const id = isFinite(+req.params.problem) ? +req.params.problem : -1;
-    const problem = await Problem.findByPk(id);
+    const problem = await Problem.findByPk(id, {
+      include: [{ model: User, as: "author" }]
+    });
 
     if (problem) {
       problem.metadata = JSON.parse(problem.metadata);
@@ -570,11 +765,13 @@ async function createServer(sequelize, config) {
       if (problem) {
         const {
           title,
+          author,
           description,
           time_limit,
           memory_limit,
           input_format,
-          output_format
+          output_format,
+          is_public
         } = req.body;
 
         if (req.files.test_data && req.files.test_data.length) {
@@ -588,7 +785,6 @@ async function createServer(sequelize, config) {
               .pipe(unzipper.Parse())
               .on("entry", async entry => {
                 files[entry.path] = await entry.buffer();
-                console.log("Read", entry.path);
               })
               .on("finish", () => resolve());
           });
@@ -599,20 +795,9 @@ async function createServer(sequelize, config) {
             if (files[file + ".a"]) {
               testCount++;
               const testName = testCount.toString();
+              await writeFile(path.resolve(config.data_folder, problem.id.toString(), testName), files[file]);
               await writeFile(
-                path.resolve(
-                  config.data_folder,
-                  problem.id.toString(),
-                  testName
-                ),
-                files[file]
-              );
-              await writeFile(
-                path.resolve(
-                  config.data_folder,
-                  problem.id.toString(),
-                  testName + ".a"
-                ),
+                path.resolve(config.data_folder, problem.id.toString(), testName + ".a"),
                 files[file + ".a"]
               );
             }
@@ -623,19 +808,23 @@ async function createServer(sequelize, config) {
             testcaseList += `${i} ${i}.a\n`;
           }
 
-          await writeFile(
-            path.resolve(
-              config.data_folder,
-              problem.id.toString(),
-              "testcases.txt"
-            ),
-            testcaseList
-          );
+          await writeFile(path.resolve(config.data_folder, problem.id.toString(), "testcases.txt"), testcaseList);
         }
 
         problem.title = title;
         problem.timeLimit = isFinite(+time_limit) ? +time_limit : 0;
         problem.memoryLimit = isFinite(+memory_limit) ? +memory_limit : 0;
+        problem.isPublic = is_public === "true";
+
+        if (author) {
+          // Check author exists
+          const user = await User.findOne({ where: { username: author } });
+          if (user) {
+            await problem.setAuthor(user);
+          } else {
+            errors.push("The user does not exist.");
+          }
+        }
 
         problem.metadata = JSON.stringify({
           description,
@@ -667,7 +856,7 @@ async function createServer(sequelize, config) {
     res.redirect(res.locals.url("problems"));
   });
 
-  app.get("/judges", adminMiddleware, async (req, res) => {
+  app.get("/judges", async (req, res) => {
     const judges = await Judge.findAll();
     res.render("judges", { judges });
   });
@@ -699,13 +888,10 @@ async function createServer(sequelize, config) {
   });
 
   app.post("/auth/login", async (req, res) => {
-    const user =
-      req.body.username &&
-      (await User.findOne({ where: { username: req.body.username } }));
+    const user = req.body.username && (await User.findOne({ where: { username: req.body.username } }));
 
     if (user) {
-      const hash =
-        req.body.password && sha256(req.body.password + user.passwordSalt);
+      const hash = req.body.password && sha256(req.body.password + user.passwordSalt);
       if (hash === user.passwordHash) {
         req.session.userId = user.id;
         res.redirect(req.body.redirect);
@@ -728,11 +914,9 @@ async function createServer(sequelize, config) {
 
     const errors = [];
     if (!username) errors.push("Username must not be empty.");
-    if (null != (await User.findOne({ where: { username } })))
-      errors.push("The username is already taken.");
+    if (null != (await User.findOne({ where: { username } }))) errors.push("The username is already taken.");
     if (!displayName) errors.push("Display name must not be empty.");
-    if (!password || password.length < 6)
-      errors.push("Password must contain at least 6 characters.");
+    if (!password || password.length < 6) errors.push("Password must contain at least 6 characters.");
 
     if (errors.length) {
       res.render("register", {
@@ -765,8 +949,7 @@ async function createServer(sequelize, config) {
   app.get("/judger/ping", judgerMiddleware, async (req, res) => {
     const { judger } = res.locals;
 
-    judger.ipAddress =
-      req.headers["x-forwarded-for"] || req.connection.remoteAddress;
+    judger.ipAddress = req.headers["x-forwarded-for"] || req.connection.remoteAddress;
     judger.lastPing = new Date();
 
     await judger.save();
@@ -806,11 +989,7 @@ async function createServer(sequelize, config) {
 
     if (updatedSubmission.judger === judger.name) {
       // Successfully claimed job.
-      console.log(
-        "Judger %s claimed submission %d",
-        judger.name,
-        updatedSubmission.id
-      );
+      console.log("Judger %s claimed submission %d", judger.name, updatedSubmission.id);
       res.json({
         success: true,
         id: updatedSubmission.id,
@@ -848,8 +1027,9 @@ async function createServer(sequelize, config) {
     }
 
     const submission = await Submission.findByPk(+id);
-    const { verdict, judgerOutput } = req.body;
+    const { score, verdict, judgerOutput } = req.body;
 
+    if (score) submission.score = score;
     if (verdict) submission.verdict = verdict;
     if (judgerOutput) submission.judgerOutput = judgerOutput;
 

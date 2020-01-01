@@ -35,22 +35,26 @@
     </div>
     <br>
 
-    <table class="table">
+    <table class="table table-bordered table-oj table-hover">
       <thead class="thead-light">
         <tr>
           <th>ID</th>
           <th>Title</th>
+          <th>Score</th>
         </tr>
       </thead>
 
       <tbody>
-        <% for (const problem of contest.problems) { %>
+        <% for (const {name, problem, score} of contest.contestProblems) { %>
         <tr>
-          <td><%= problem.id %></td>
+          <td><%= name %></td>
           <td>
-            <a href="<%= url(`contest/${contest.id}/problem/${problem.id}`) %>">
+            <a href="<%= url(`contest/${contest.id}/problem/${name}`) %>">
               <%= problem.title %>
             </a>
+          </td>
+          <td>
+            <%= score %>
           </td>
         </tr>
         <% } %>

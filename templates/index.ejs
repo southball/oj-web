@@ -10,6 +10,14 @@
   <%- include('parts/navbar') %>
 
   <div class="container">
+    <% if (isAdmin) { %>
+    <div>
+      <a href="<%= url('announcement', 'new') %>">
+        <button type="button" class="btn btn-primary">Add Announcement</button>
+      </a>
+    </div><br>
+    <% } %>
+
     <% for (const announcement of announcements) { %>
     <div class="card">
       <div class="card-body">

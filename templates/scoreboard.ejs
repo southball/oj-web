@@ -11,33 +11,39 @@
 
   <div class="container">
     <h1>Scoreboard</h1>
-    <table class="table">
+    <table class="table table-bordered table-oj table-hover">
       <thead>
         <tr>
           <th>User</th>
-          <% for (const problem of contest.problems) { %>
+          <th>Score</th>
+          <th>Penalty</th>
+          <% for (const { name, problem } of contest.contestProblems) { %>
           <th>
-            <a href="<%= url(`contest/${contest.id}/problem/${problem.id}`) %>">
+            <a href="<%= url('contest', contest.id, 'problem', name) %>">
               <%= problem.id %>. <%= problem.title %>
             </a>
           </th>
           <% } %>
         </tr>
       </thead>
-      <% for (const user of users) { %>
+      <% for (const {user, submissions, score, penalty} of users) { %>
       <tr>
         <td>
           <a href="<%= url('user', user.username) %>">
             <%= user.username %>
           </a>
         </td>
-        <% for (const problem of contest.problems) { %>
+        <td><%= score %></td>
+        <td><%= penalty %></td>
+        <% for (const contestProblem of contest.contestProblems) { %>
         <td>
-          <% if (submissions[user.username][problem.id]) { %>
-          <span class="badge badge-<%= verdictBadgeType(submissions[user.username][problem.id].verdict) %>">
-            <%= submissions[user.username][problem.id].verdict %>
-          </span>
-          <%= moment.duration(moment().diff(contest.startTime)).locale("en").humanize() %>
+          <% const submission = submissions.get(contestProblem.name); %>
+          <% console.log(submission); %>
+          <% if (submission) { %>
+          <a
+            href="<%= url('contest', submission.contest.id, 'problem', submission.contestProblem.name, 'submission', submission.id) %>">
+            <%= submission.verdict %>
+          </a>
           <% } else { %>
           -
           <% } %>

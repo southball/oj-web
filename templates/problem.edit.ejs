@@ -21,6 +21,23 @@
 
       <div class="row">
         <div class="col-md">
+          <h3>Author</h3>
+          <input type="text" class="form-control" name="author"
+            value="<%= problem.author ? problem.author.username : "" %>">
+          <br>
+        </div>
+
+        <div class="col-md">
+          <h3>Is Public?</h3>
+          <select class="form-control" name="is_public">
+            <option value="true" <%= problem.isPublic && 'selected' %>>Yes</option>
+            <option value="false" <%= !problem.isPublic && 'selected' %>>No</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-md">
           <h3>Time Limit (ms)</h3>
           <input type="number" class="form-control" name="time_limit" value="<%= problem.timeLimit %>">
           <br>

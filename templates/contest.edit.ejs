@@ -14,10 +14,23 @@
   <div class="container">
     <h1><%= contest.title %></h1>
 
+    <%- include('parts/messages') %>
+
     <form method="POST">
-      <h3>Contest Name</h3>
-      <input class="form-control" type="text" name="title" value="<%= contest.title %>">
-      <br>
+      <div class="row">
+        <div class="col-md-9">
+          <h3>Contest Name</h3>
+          <input class="form-control" type="text" name="title" value="<%= contest.title %>">
+          <br>
+        </div>
+        <div class="col-md-3">
+          <h3>Is Public?</h3>
+          <select class="form-control" name="is_public">
+            <option value="true" <%= contest.isPublic ? 'selected' : '' %>>Yes</option>
+            <option value="false" <%= !contest.isPublic ? 'selected' : '' %>>No</option>
+          </select>
+        </div>
+      </div>
 
       <div class="row">
         <div class="col-md">
@@ -56,21 +69,24 @@
       </div>
       <br>
 
-      <table class="table table-hover">
+      <table class="table table-bordered table-oj table-hover">
         <thead class="thead-light">
           <tr>
             <th>ID</th>
             <th>Title</th>
+            <th>Score</th>
             <th>Actions</th>
           </tr>
         </thead>
 
         <tbody>
           <tr>
-            <td colspan="3">
+            <td colspan="4">
               <label for="new_problem">Add Problem</label>
               <div class="input-group">
-                <input name="new_problem" class="form-control" type="text">
+                <input name="new_problem_name" class="form-control" type="text" placeholder="Name"
+                  style="width: 100px; max-width: 100px;">
+                <input name="new_problem" class="form-control" type="text" placeholder="Enter Problem ID here">
                 <div class="input-group-append">
                   <button type="submit" class="btn btn-primary">+</button>
                 </div>
@@ -78,25 +94,33 @@
             </td>
           </tr>
 
-          <% if (contest.problems.length === 0) { %>
+          <% if (contest.contestProblems.length === 0) { %>
           <tr>
-            <td colspan="3">
+            <td colspan="4">
               There are no problems yet. Add some problems above...
             </td>
           </tr>
           <% } %>
 
-          <% for (const problem of contest.problems) { %>
+          <% for (const i in contest.contestProblems) { %>
+          <% const {name, score, problem} = contest.contestProblems[i]; %>
           <tr>
-            <td><%= problem.id %></td>
             <td>
-              <a href="<%= url(`contest/${contest.id}/problem/${problem.id}`) %>">
+              <input class="form-control form-control-sm" type="text" name="name[<%= i %>]" value="<%= name %>"
+                style="width: 100px;">
+            </td>
+            <td style="width: 100%; vertical-align: middle;">
+              <a href="<%= url('contest', contest.id, 'problem', name) %>">
                 <%= problem.title %>
               </a>
             </td>
             <td>
-              <a href="<%= url(`contest/${contest.id}/problem/${problem.id}/delete`) %>">
-                <button type="button" class="btn btn-danger">
+              <input class="form-control form-control-sm" type="number" name="score[<%= i %>]" value="<%= score %>"
+                style="width: 100px;">
+            </td>
+            <td>
+              <a href="<%= url(`contest/${contest.id}/problem/${name}/delete`) %>">
+                <button type="button" class="btn btn-danger btn-sm">
                   Delete
                 </button>
               </a>

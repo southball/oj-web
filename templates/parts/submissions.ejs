@@ -1,10 +1,10 @@
-<table class="table table-hover">
+<table class="table table-bordered table-oj table-hover">
   <thead class="thead-light">
     <tr>
       <th>ID</th>
-      <th>Verdict</th>
       <th>Date</th>
       <th>User</th>
+      <th>Verdict</th>
       <% if (isAdmin) { %>
       <th>Judge</th>
       <% } %>
@@ -13,20 +13,25 @@
 
   <tbody>
     <% for (const submission of submissions) { %>
+    <% 
+      const submissionUrl = contest
+        ? url('contest', contest.id, 'problem', submission.contestProblem.name, 'submission', submission.id)
+        : url('problem', submission.problem.id, 'submission', submission.id);
+    %>
     <tr>
       <td>
-        <a href="<%= url(`problem/${submission.problem.id}/submission/${submission.id}`) %>">
+        <a href="<%= submissionUrl %>">
           <%= submission.id %>
         </a>
-      </td>
-      <td>
-        <span class="badge badge-<%= verdictBadgeType(submission.verdict) %>"><%= submission.verdict %></span>
       </td>
       <td><%= moment(submission.time).format('YYYY-MM-DD hh:mm:ss') %></td>
       <td>
         <a href="<%= url('user', submission.user.username) %>">
           <%= submission.user.username %>
         </a>
+      </td>
+      <td>
+        <span class="badge badge-<%= verdictBadgeType(submission.verdict) %>"><%= submission.verdict %></span>
       </td>
       <% if (isAdmin) { %>
       <td>

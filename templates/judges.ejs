@@ -12,19 +12,24 @@
   <div class="container">
     <h1>Judges</h1>
 
-    <table class="table table-hover">
+    <table class="table table-bordered table-oj table-hover">
       <thead class="thead-light">
         <tr>
           <th>ID</th>
           <th>Name</th>
+          <% if (isAdmin) { %>
           <th>Key</th>
           <th>IP Address</th>
+          <% } %>
           <th>Last Ping</th>
+          <% if (isAdmin) { %>
           <th>Action</th>
+          <% } %>
         </tr>
       </thead>
 
       <tbody>
+        <% if (isAdmin) { %>
         <tr>
           <td colspan="6">
             <form method="POST" action="<%= url('judge/new') %>">
@@ -38,19 +43,24 @@
             </form>
           </td>
         </tr>
+        <% } %>
 
         <% for (const judge of judges) { %>
         <tr>
           <td><%= judge.id %></td>
           <td><%= judge.name %></td>
+          <% if (isAdmin) { %>
           <td><%= judge.key %></td>
           <td><%= judge.ipAddress %></td>
+          <% } %>
           <td><%= moment(judge.lastPing).format('YYYY-MM-DD hh:mm:ss') %></td>
+          <% if (isAdmin) { %>
           <td>
             <a href="<%= url(`judge/${judge.id}/delete`) %>">
-              <button type="button" class="btn btn-danger">Delete</button>
+              <button type="button" class="btn btn-danger btn-sm">Delete</button>
             </a>
           </td>
+          <% } %>
         </tr>
         <% } %>
       </tbody>

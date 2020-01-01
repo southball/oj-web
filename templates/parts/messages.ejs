@@ -1,0 +1,18 @@
+<% if (typeof messages !== 'undefined' && Array.isArray(messages) && messages.length) { %>
+<div class="alert alert-success">
+  <ul style="margin-bottom: 0;">
+    <% for (const message of messages) { %>
+    <li><%= message %></li>
+    <% } %>
+  </ul>
+</div>
+<% } %>
+<% if (typeof errors !== 'undefined' && Array.isArray(errors) && errors.length) { %>
+<div class="alert alert-danger">
+  <ul style="margin-bottom: 0;">
+    <% for(const error of errors) { %>
+    <li><%= error %></li>
+    <% } %>
+  </ul>
+</div>
+<% } %>
