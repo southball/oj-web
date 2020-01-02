@@ -1040,6 +1040,38 @@ async function createServer(sequelize, config) {
     });
   });
 
+  // Add some submissions to pressure test the judge
+  // {
+  //   const codes = [
+  //     `
+  // #include <bits/stdc++.h>
+  // using namespace std;
+  // int main() { int a, b; cin >> a >> b;
+  //  cout << a + b << endl;}
+  // `,
+  //     `
+  // #include<bits/stdc++.h>
+  // using namespace std;
+  // int main() { for (;;) ; }
+  // `,
+  //     `
+  // #include<bits/stdc++.h>
+  // using namespace std;
+  // int main() { cout<<3<<endl; }
+  // `
+  //   ];
+  //   const user = await User.findByPk(1);
+  //   const problem = await Problem.findByPk(1);
+  //   for (var i = 0; i < 100; i++) {
+  //     const submission = new Submission();
+  //     submission.body = codes[Math.floor(Math.random() * 3)];
+  //     await submission.save();
+
+  //     await submission.setProblem(problem);
+  //     await submission.setUser(user);
+  //   }
+  // }
+
   console.log("Server listening on port %d", config.port);
   app.listen(config.port);
 }
